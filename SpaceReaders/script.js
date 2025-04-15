@@ -1,107 +1,138 @@
-const canvas = document.getElementById('gameCanvas')
-const ctx = canvas.getContext('2d')
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
 class Entidade {
-    constructor(x, y, largura, altura, cor) {
-        this.x = x
-        this.y = y
-        this.largura = largura
-        this.altura = altura
-        this.cor = cor
-    }
+constructor(x, y, largura, altura, cor) {
+this.x = x;
+this.y = y;
+this.largura = largura;
+this.altura = altura;
+this.cor = cor;
+}
 
-
-    desenhar() {
-        ctx.fillStyle = this.cor
-        ctx.fillRect(this.x, this.y, this.largura, this.altura)
-    }
+desenhar() {
+ctx.fillStyle = this.cor;
+ctx.fillRect(this.x, this.y, this.largura, this.altura);
+}
 }
 
 class Jogador extends Entidade {
-    constructor(x, y, largura, altura, cor, velocidade) {
-        super(x, y, largura, altura, cor)
-        this.velocidade = velocidade
-        
-    }
-
-    mover(direcao) {
-        if (direcao == 'esquerda' && this.x > 0) {
-            this.x -= this.velocidade
-        } else if (direcao == 'direita' && this.x + this.largura < canvas.width) {
-            this.x += this.velocidade
-        }
-    }
+constructor() {
+super(canvas.width/2 - 25, canvas.height - 60, 50, 50, 'blue')
+this.velocidade = 15
 }
 
-class Projetil extends Entidade {
-    constructor(x, y, largura, altura, cor, velocidade) {
-        super(x, y, largura, altura, cor)
-        this.velocidade = velocidade
-    }
-
-    atualizar() {
-        this.y -= this.velocidade
-    }
-}
-class Obstaculo{
-    constructor(x,y,largura,altura,cor){
-        this.x = x,
-        this.y = y,
-        this.largura = largura,
-        this.altura = altura,
-        this.cor = cor
-    }
-    desenhar(){
-        ctx.fillStyle = this.cor
-        ctx.fillRect(this.x, this.y, this.largura, this.altura)
-    }
+mover(direcao) {
+if (direcao == 'esquerda') this.x = Math.max(0, this.x - this.velocidade)
+if (direcao == 'direita') this.x = Math.min(canvas.width - this.largura, this.x + this.velocidade)
 }
 
+atirar() {
+return new Tiro(this.x + this.largura/2 - 2.5, this.y - 10)
+}
+}
 
-const obstaculo = new Entidade(50,50,50,50,'red')
+class Alien extends Entidade {
+constructor(x) {
+super(x, -40, 40, 40, 'white')
+this.velocidade = 1 + Math.random() * 0.5
+}
 
+atualizar() {
+this.y += this.velocidade
+return this.y > canvas.height
+}
+}
 
-function loop(){
-    ctx.clearRect(0,0,canvas.width, canvas.height)
-    objeto_na_tela.desenhar()
-    aliens.desenhar()
-    aliens.atualizar()
+class Tiro extends Entidade {
+constructor(x, y) {
+super(x, y, 5, 15, 'blue')
+this.velocidade = 8
+}
 
-    requestAnimationFrame(loop)
+atualizar() {
+this.y -= this.velocidade
+return this.y < 0
+}
+}
+
+const jogador = new Jogador()
+const tiros = []
+const aliens = []
+let pontuacao = 0
+let gameOver = false
+let ultimoAlien = 0
+
+document.addEventListener('keydown', (e) => {
+if (gameOver) return
+
+if (e.key == 'ArrowLeft') jogador.mover('esquerda')
+if (e.key == 'ArrowRight') jogador.mover('direita')
+if (e.key == ' ') tiros.push(jogador.atirar())
+})
+
+function checarColisao(a, b) {
+return a.x < b.x + b.largura &&
+a.x + a.largura > b.x &&
+a.y < b.y + b.altura &&
+a.y + a.altura > b.y;
 }
 
 function loop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    jogador.desenhar()
+if (!gameOver) {
 
-    projeteis.forEach((projetil, index) => {
-        projetil.atualizar()
-        projetil.desenhar()
-        if (projetil.y < 0) {
-            projeteis.splice(index, 1)
-        }
-    })
-
-  
-
-    requestAnimationFrame(loop)
+if (Date.now() - ultimoAlien > 2000) {
+aliens.push(new Alien(Math.random() * (canvas.width - 40)))
+ultimoAlien = Date.now()
 }
 
-document.addEventListener('keydown', (event) => {
-    if (event.key == 'ArrowLeft') {
-        jogador.mover('esquerda')
-    } else if (event.key == 'ArrowRight') {
-        jogador.mover('direita')
-    } else if (event.key == ' ') {
-        projeteis.push(new Projetil(jogador.x + jogador.largura / 2 - 5, jogador.y, 10, 20, 'blue', 7))
-    }
-})
+for (let i = aliens.length - 1; i >= 0; i--) {
+if (aliens[i].atualizar()) {
+gameOver = true
+break
+}
 
-const jogador = new Jogador(canvas.width / 2 - 25, canvas.height - 60, 50, 50, 'purple', 5)
-const aliens = []
-const projeteis = []
+if (checarColisao(aliens[i], jogador)) {
+gameOver = true
+break
+}
+
+aliens[i].desenhar()
+}
+
+for (let i = tiros.length - 1; i >= 0; i--) {
+if (tiros[i].atualizar()) {
+tiros.splice(i, 1)
+continue
+}
+
+for (let j = aliens.length - 1; j >= 0; j--) {
+if (checarColisao(tiros[i], aliens[j])) {
+aliens.splice(j, 1)
+tiros.splice(i, 1)
+pontuacao += 10
+break
+}
+}
+
+if (i < tiros.length) tiros[i].desenhar()
+}
+
+jogador.desenhar()
+
+ctx.fillStyle = 'gray'
+ctx.font = '10px Arial'
+ctx.fillText(`Pontuação: ${pontuacao}`, 10, 30)
+} else {
+
+ctx.fillStyle = 'gray'
+ctx.font = '48px Arial'
+ctx.fillText('Game Over', canvas.width/2 - 120, canvas.height/2)
+ctx.font = '20px Arial'
+ctx.fillText(` Pontos finais: ${pontuacao}`, canvas.width/2 - 100, canvas.height/2 + 40)
+}
+requestAnimationFrame(loop)
+}
 loop()
-
-//quase desistindo
-//desisti
